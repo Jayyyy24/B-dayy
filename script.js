@@ -512,24 +512,33 @@ envelopeArea.addEventListener("click", () => {
 // --- RESTART BUTTON LOGIC ---
 const btnRestart = document.getElementById("btn-restart-app");
 if (btnRestart) {
-    btnRestart.addEventListener("click", () => {
-        // Navigate to the base URL with NO hash before reloading.
-        //
-        // Why not window.location.reload()?
-        //   reload() keeps the current URL — including whatever hash is in it
-        //   (e.g. #gifts). DOMContentLoaded then reads that hash and jumps
-        //   straight back to the gifts screen, so the experience never resets.
-        //
-        // window.location.replace(baseUrl) does two things:
-        //   1. Strips the hash → page loads at #welcome (the default).
-        //   2. REPLACES the current history entry instead of pushing a new one,
-        //      so the back-stack isn't polluted with the restart action.
-        //
-        // sessionStorage / localStorage are never written to by this app,
-        // so no extra cleanup is needed — stripping the hash is sufficient.
+
+    // The actual restart action — navigates to the base URL with no hash
+    // so the page reloads at the welcome screen with all state cleared.
+    function executeRestart(e) {
+        // Prevent the ghost click that fires ~300 ms after touchend on
+        // Android browsers that don't honour touch-action: manipulation.
+        if (e && e.cancelable) e.preventDefault();
+
+        // Guard: ignore if we've already triggered a navigation this tick
+        // (can happen if both touchend AND the synthetic click both fire)
+        if (executeRestart._fired) return;
+        executeRestart._fired = true;
+
+        // Strip the hash from the URL so DOMContentLoaded starts at #welcome.
+        // replace() overwrites the history entry — no extra back-stack pollution.
         const baseUrl = window.location.pathname + window.location.search;
         window.location.replace(baseUrl);
-    });
+    }
+    executeRestart._fired = false;
+
+    // Primary: standard click (desktop, iOS Safari, most mobile)
+    btnRestart.addEventListener("click", executeRestart);
+
+    // Backup: touchend fires before click on Android Chrome / Samsung Internet.
+    // { passive: false } lets us call preventDefault() to cancel the later
+    // synthetic click so executeRestart doesn't run twice.
+    btnRestart.addEventListener("touchend", executeRestart, { passive: false });
 }
 
 // --- BACKGROUND MUSIC CONTROLLER ---

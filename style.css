@@ -1723,6 +1723,11 @@ body {
     box-sizing: border-box;
     text-align: center;
     font-family: 'Caveat', cursive;
+    /* backdrop-filter creates a GPU stacking context on Android Chrome.
+       Setting pointer-events: none ensures it never swallows taps aimed
+       at the restart button that sits below it in the DOM. The text inside
+       is non-interactive so this has no UX impact. */
+    pointer-events: none;
 }
 
 .popup-message.hidden {
@@ -1756,9 +1761,18 @@ body {
 
 .restart-wrapper {
     margin-top: 25px;
+    margin-bottom: 20px;
     width: 100%;
     display: flex;
     justify-content: center;
+    /* Create a dedicated stacking context so the wrapper and its button
+       are always painted above siblings (including the popup-message whose
+       backdrop-filter promotes it in the GPU layer stack on Android). */
+    position: relative;
+    z-index: 20;
+    isolation: isolate;
+    /* Never let anything suppress pointer events on this container */
+    pointer-events: auto;
 }
 
 .restart-wrapper.hidden {
@@ -1790,6 +1804,17 @@ body {
     font-weight: 800;
     box-shadow: none;
     transition: all 0.2s ease;
+    cursor: pointer;
+    /* Eliminates the 300 ms tap-delay on Android/iOS without disabling
+       pinch-zoom — the single most common cause of "button not working"
+       on mobile when the desktop version works fine. */
+    touch-action: manipulation;
+    /* Visible tap highlight on Android so the user gets instant feedback */
+    -webkit-tap-highlight-color: rgba(255, 255, 255, 0.25);
+    /* Ensure nothing can suppress interaction on this element */
+    pointer-events: auto;
+    position: relative;
+    z-index: 21;
 }
 
 .btn-restart:hover {
@@ -1904,10 +1929,17 @@ body {
 
     /* Ensure page content has enough bottom clearance on mobile */
     .container {
-        padding-bottom: 70px;
+        padding-bottom: 80px;
     }
     .action-footer {
         margin-bottom: 30px;
+    }
+
+    /* Extra bottom room on the gifts screen specifically — it has the most
+       content (title + instructions + gift grid + popup + restart button)
+       and the restart button is most likely to be obscured by the music footer */
+    #screen-gifts .container {
+        padding-bottom: 100px;
     }
 
     /* Ensure all primary buttons sit above the music footer */
@@ -1915,8 +1947,7 @@ body {
     .btn-blow,
     .btn-take,
     .btn-see,
-    .btn-next,
-    .btn-restart {
+    .btn-next {
         position: relative;
         z-index: 10;
     }
