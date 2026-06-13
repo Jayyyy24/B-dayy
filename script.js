@@ -513,8 +513,22 @@ envelopeArea.addEventListener("click", () => {
 const btnRestart = document.getElementById("btn-restart-app");
 if (btnRestart) {
     btnRestart.addEventListener("click", () => {
-        // Full page reload — cleanest reset, no glitches
-        window.location.reload();
+        // Navigate to the base URL with NO hash before reloading.
+        //
+        // Why not window.location.reload()?
+        //   reload() keeps the current URL — including whatever hash is in it
+        //   (e.g. #gifts). DOMContentLoaded then reads that hash and jumps
+        //   straight back to the gifts screen, so the experience never resets.
+        //
+        // window.location.replace(baseUrl) does two things:
+        //   1. Strips the hash → page loads at #welcome (the default).
+        //   2. REPLACES the current history entry instead of pushing a new one,
+        //      so the back-stack isn't polluted with the restart action.
+        //
+        // sessionStorage / localStorage are never written to by this app,
+        // so no extra cleanup is needed — stripping the hash is sufficient.
+        const baseUrl = window.location.pathname + window.location.search;
+        window.location.replace(baseUrl);
     });
 }
 
