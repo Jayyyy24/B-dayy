@@ -136,81 +136,104 @@ function adjustCollageScale() {
 window.addEventListener("resize", adjustCollageScale);
 window.addEventListener("load", adjustCollageScale);
 
-// --- NAVIGATION MANAGER (with History API) ---
-
-// Flag: when true, navigateTo() won't push a new history entry (used during popstate)
-let isHandlingPopstate = false;
-
-// Internal history stack — mirrors the browser history entries we own
-let navHistory = ["screen-welcome"];
+// --- NAVIGATION MANAGER (Hash-based — works on Android Chrome swipe-back + file:// URLs) ---
 
 /**
- * Core navigation — switches the visible screen.
- * Pushes a browser history entry unless we're responding to a popstate event.
+ * Every screen maps to a URL hash.
+ * Changing location.hash natively pushes a browser history entry, which means
+ * Android Chrome's edge swipe-back gesture fires `hashchange` instead of
+ * exiting the page — no pushState/popstate needed.
  */
-function navigateTo(screenId) {
-    console.log(`Navigating to ${screenId}`);
+const SCREEN_HASHES = {
+    "screen-welcome":  "#welcome",
+    "screen-goaway":   "#goaway",
+    "screen-passcode": "#passcode",
+    "screen-crown":    "#crown",
+    "screen-camera":   "#camera",
+    "screen-reveal":   "#reveal",
+    "screen-wish":     "#wish",
+    "screen-gifts":    "#gifts",
+    "detail-letter":   "#letter",
+    "detail-gallery":  "#gallery",
+};
+
+// Reverse map: hash → screenId
+const HASH_TO_SCREEN = Object.fromEntries(
+    Object.entries(SCREEN_HASHES).map(([k, v]) => [v, k])
+);
+
+// Track the last hash WE set programmatically so hashchange handler
+// can skip it (the DOM is already updated by navigateTo).
+let lastProgrammaticHash = "";
+
+/**
+ * Update the DOM to show `screenId` and apply all screen-specific side-effects.
+ * Does NOT touch the URL — call navigateTo() for full navigation.
+ */
+function showScreen(screenId) {
+    console.log(`showScreen: ${screenId}`);
 
     // Deactivate current screen
     const current = document.getElementById(appState.currentScreen);
-    if (current) {
-        current.classList.remove("active");
-    }
+    if (current) current.classList.remove("active");
 
     // Activate target screen
     const target = document.getElementById(screenId);
-    if (target) {
-        target.classList.add("active");
-        appState.currentScreen = screenId;
+    if (!target) return;
 
-        // --- History API: push state so browser Back works ---
-        if (!isHandlingPopstate) {
-            navHistory.push(screenId);
-            history.pushState({ screen: screenId }, "", "");
-        }
+    target.classList.add("active");
+    appState.currentScreen = screenId;
 
-        // Dynamic layouts adjustment on activation
-        if (screenId === "screen-welcome") {
-            runTypewriter();
-        }
+    // Screen-specific side-effects
+    if (screenId === "screen-welcome")  runTypewriter();
+    if (screenId === "screen-passcode") resetPasscode();
+    if (screenId === "screen-gifts")    checkRevealRestart();
+    if (screenId.startsWith("detail-")) setTimeout(adjustCollageScale, 50);
+}
 
-        if (screenId === "screen-passcode") {
-            resetPasscode();
-        }
+/**
+ * Navigate to a screen.
+ * Updates the DOM and changes location.hash, which automatically creates
+ * a browser history entry — enabling Android swipe-back and desktop Back.
+ */
+function navigateTo(screenId) {
+    console.log(`navigateTo: ${screenId}`);
 
-        if (screenId === "screen-gifts") {
-            checkRevealRestart();
-        }
+    // Update the DOM immediately
+    showScreen(screenId);
 
-        if (screenId.startsWith("detail-")) {
-            setTimeout(adjustCollageScale, 50);
-        }
+    // Push a browser history entry by changing the hash.
+    // This single line is what makes Android Chrome swipe-back work.
+    const newHash = SCREEN_HASHES[screenId] || "#welcome";
+    if (window.location.hash !== newHash) {
+        lastProgrammaticHash = newHash;   // tell hashchange handler to skip this
+        window.location.hash = newHash;   // ← creates a real browser history entry
     }
 }
 
 /**
- * Handle the browser / OS back button.
- * Pops our internal stack and navigates to the previous screen.
- * If there's no previous screen, we let the browser leave the page naturally.
+ * Handle browser Back / Forward / Android swipe-back / keyboard Alt+Left.
+ * When the browser navigates to a previous hash, we update the DOM to match.
  */
-window.addEventListener("popstate", (e) => {
-    // Remove the screen we're leaving from our stack
-    if (navHistory.length > 1) {
-        navHistory.pop();
+window.addEventListener("hashchange", () => {
+    const hash = window.location.hash;
+
+    // Skip hashes that WE just set — the DOM is already correct
+    if (hash === lastProgrammaticHash) {
+        lastProgrammaticHash = "";
+        return;
     }
 
-    const previousScreen = navHistory.length > 0
-        ? navHistory[navHistory.length - 1]
-        : "screen-welcome";
+    // Browser-initiated navigation (swipe-back, Back button, etc.)
+    const screenId = HASH_TO_SCREEN[hash] || "screen-welcome";
 
-    // Side-effects for specific back transitions
-    if (appState.currentScreen === "detail-letter") {
+    // Side-effects for LEAVING specific screens
+    if (appState.currentScreen === "detail-letter" && screenId !== "detail-letter") {
         resetEnvelope();
     }
 
-    isHandlingPopstate = true;
-    navigateTo(previousScreen);
-    isHandlingPopstate = false;
+    // Update DOM only — do NOT change the hash again
+    showScreen(screenId);
 });
 
 // --- FLOATING HEARTS & SPARKLE GENERATOR ---
@@ -306,7 +329,7 @@ btnWelcomeNo.addEventListener("click", () => {
     navigateTo("screen-goaway");
 });
 
-// Back from Go Away — use history.back() to keep browser history in sync
+// Back from Go Away — history.back() restores #welcome hash → hashchange fires → showScreen
 btnGoAwayBack.addEventListener("click", () => {
     history.back();
 });
@@ -424,13 +447,15 @@ giftGallery.addEventListener("click", () => {
     navigateTo("detail-gallery");
 });
 
-// Back to Gift Hub triggers — use history.back() so browser history stays in sync
+// Back to Gift Hub triggers.
+// history.back() restores the previous hash (#gifts) → hashchange fires →
+// showScreen("screen-gifts") — resetEnvelope() is called by the hashchange handler.
 btnLetterBack.addEventListener("click", () => {
-    history.back(); // popstate handler will call resetEnvelope() and navigateTo
+    history.back();
 });
 
 btnGalleryBack.addEventListener("click", () => {
-    history.back(); // popstate handler navigates back to screen-gifts
+    history.back();
 });
 
 function checkRevealRestart() {
@@ -581,6 +606,20 @@ window.addEventListener("DOMContentLoaded", () => {
         tryPlayMusic();
     }
 
-    // Set the initial history entry so the first screen is in the browser stack
-    history.replaceState({ screen: "screen-welcome" }, "", "");
+    // Seed the initial hash using replaceState so we don't push an extra
+    // history entry — the user can still press Back to exit the site from
+    // the welcome screen.
+    const initialHash = SCREEN_HASHES["screen-welcome"]; // "#welcome"
+    if (!window.location.hash || !HASH_TO_SCREEN[window.location.hash]) {
+        // No recognised hash in the URL — set #welcome without a new history entry
+        lastProgrammaticHash = initialHash;
+        history.replaceState(null, "", initialHash);
+    } else {
+        // Page opened with a recognised hash (e.g. bookmarked #gifts) —
+        // show that screen directly.
+        const startScreen = HASH_TO_SCREEN[window.location.hash];
+        if (startScreen && startScreen !== "screen-welcome") {
+            showScreen(startScreen);
+        }
+    }
 });
