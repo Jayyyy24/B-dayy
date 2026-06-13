@@ -4,6 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Special for Aishwarya 🎂</title>
+
+    <!-- Prevent bfcache (back-forward cache) on Android Chrome so pull-to-refresh
+         always does a full reload instead of restoring stale JS/DOM state. -->
+    <meta http-equiv="Cache-Control" content="no-store">
+
+    <!-- EARLIEST POSSIBLE hash reset — runs before CSS paints, before external
+         scripts load, before any event listener exists. This is the only reliable
+         way to strip a stale hash on Android Chrome pull-to-refresh because
+         replaceState in an external <script> can fire too late. -->
+    <script>
+        if (location.hash && location.hash !== '#welcome') {
+            history.replaceState(null, '', location.pathname + location.search);
+        }
+    </script>
+
     <!-- Google Fonts for Playful, Clean and Handwritten Typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

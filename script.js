@@ -645,52 +645,85 @@ window.addEventListener("DOMContentLoaded", () => {
     history.replaceState(null, "", lastProgrammaticHash);
 });
 
-// --- BFCACHE / PULL-TO-REFRESH HANDLER ---
-// Android Chrome pull-to-refresh may restore the page from bfcache (back-forward
-// cache). When that happens, DOMContentLoaded does NOT fire — the entire JS state,
-// DOM classes, and active screen are preserved in memory exactly as they were.
-// pageshow fires in ALL cases: fresh load, bfcache restore, and pull-to-refresh.
-window.addEventListener("pageshow", (e) => {
-    // e.persisted === true means the page was restored from bfcache
-    // But we reset on EVERY pageshow to also catch Android Chrome edge cases
-    // where persisted is false but the DOM state is still stale.
+// --- PREVENT BFCACHE + FORCE WELCOME ON EVERY PAGE SHOW ---
 
-    // Reset the hash to #welcome
-    lastProgrammaticHash = "#welcome";
+// Adding a beforeunload listener tells the browser this page has "pending state"
+// and must NOT be stored in bfcache. This is the most reliable way to prevent
+// bfcache across all Android Chrome versions.
+window.addEventListener("beforeunload", () => {
+    // Intentionally empty — the mere existence of this listener prevents bfcache.
+});
+
+// pageshow fires on EVERY page display: fresh load, bfcache restore, and
+// pull-to-refresh. We unconditionally reset to the welcome screen here.
+window.addEventListener("pageshow", () => {
+    // 1. Force the hash to #welcome (or strip it entirely)
+    if (typeof lastProgrammaticHash !== "undefined") {
+        lastProgrammaticHash = "#welcome";
+    }
     history.replaceState(null, "", "#welcome");
 
-    // If the DOM is showing a screen other than welcome, fix it
-    if (appState.currentScreen !== "screen-welcome") {
-        // Deactivate whatever screen was showing
-        const staleScreen = document.getElementById(appState.currentScreen);
-        if (staleScreen) staleScreen.classList.remove("active");
+    // 2. Deactivate ALL screens — don't trust appState, it may be stale from bfcache
+    document.querySelectorAll(".screen.active, .detail-screen.active").forEach(el => {
+        el.classList.remove("active");
+    });
 
-        // Activate welcome screen
-        const welcomeScreen = document.getElementById("screen-welcome");
-        if (welcomeScreen) welcomeScreen.classList.add("active");
+    // 3. Activate only the welcome screen
+    const welcomeScreen = document.getElementById("screen-welcome");
+    if (welcomeScreen) welcomeScreen.classList.add("active");
 
-        // Reset all app state to initial values
-        appState.currentScreen = "screen-welcome";
-        appState.enteredPasscode = "";
-        appState.passcodeCorrect = false;
-        appState.candlesBlown = false;
-        appState.letterOpened = false;
-        appState.visitedGallery = false;
-        appState.visitedLetter = false;
+    // 4. Reset all app state to initial values
+    appState.currentScreen = "screen-welcome";
+    appState.enteredPasscode = "";
+    appState.passcodeCorrect = false;
+    appState.candlesBlown = false;
+    appState.letterOpened = false;
+    appState.visitedGallery = false;
+    appState.visitedLetter = false;
 
-        // Re-run the welcome typewriter
-        runTypewriter();
+    // 5. Re-run the welcome typewriter
+    runTypewriter();
 
-        // Hide the popup and restart button (they may have been revealed)
-        const specialMsgPopup = document.getElementById("special-msg-popup");
-        const restartContainer = document.getElementById("restart-container");
-        if (specialMsgPopup) {
-            specialMsgPopup.classList.add("hidden");
-            specialMsgPopup.classList.remove("fade-in");
-        }
-        if (restartContainer) {
-            restartContainer.classList.add("hidden");
-            restartContainer.classList.remove("fade-in");
-        }
+    // 6. Hide the popup and restart button (they may have been revealed)
+    const specialMsgPopup = document.getElementById("special-msg-popup");
+    const restartContainer = document.getElementById("restart-container");
+    if (specialMsgPopup) {
+        specialMsgPopup.classList.add("hidden");
+        specialMsgPopup.classList.remove("fade-in");
+    }
+    if (restartContainer) {
+        restartContainer.classList.add("hidden");
+        restartContainer.classList.remove("fade-in");
+    }
+
+    // 7. Reset the NEXT button on passcode screen (may still be visible from bfcache)
+    const btnPassNext = document.getElementById("btn-passcode-next");
+    if (btnPassNext) btnPassNext.classList.add("hidden");
+
+    // 8. Reset candles to lit state
+    document.querySelectorAll(".candle").forEach(candle => {
+        candle.classList.add("active");
+        candle.classList.remove("blown");
+    });
+
+    // 9. Reset wish screen
+    const wishTitleEl = document.getElementById("wish-title");
+    const btnBlowEl = document.getElementById("btn-wish-blow");
+    const btnWishNextEl = document.getElementById("btn-wish-next");
+    if (wishTitleEl) wishTitleEl.innerHTML = "Now its time to make a wish ✨💫";
+    if (btnBlowEl) btnBlowEl.classList.remove("hidden");
+    if (btnWishNextEl) btnWishNextEl.classList.add("hidden");
+
+    // 10. Reset envelope state
+    const envelopeEl = document.querySelector("#envelope-click-area .heart-envelope");
+    const envelopeAreaEl = document.getElementById("envelope-click-area");
+    const fullLetterEl = document.getElementById("full-scrapbook-letter");
+    const ribbonEl = document.getElementById("ribbon-container");
+    if (envelopeEl) envelopeEl.classList.remove("open");
+    if (envelopeAreaEl) envelopeAreaEl.classList.remove("hidden");
+    if (fullLetterEl) {
+        fullLetterEl.classList.add("hidden");
+        fullLetterEl.classList.remove("fade-in");
     }
 });
+
