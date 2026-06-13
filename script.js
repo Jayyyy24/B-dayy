@@ -6,7 +6,7 @@
 const CONFIG = {
     passcode: "1432", // Passcode from the video (1432)
     girlName: "Aishwarya",
-    floatingHeartsInterval: 400, // Spawn rate for hearts in ms
+    floatingHeartsInterval: 800, // Spawn rate for hearts in ms
     maxHearts: 45 // Prevent browser lag on mobile
 };
 
@@ -173,25 +173,37 @@ function navigateTo(screenId) {
 
 // --- FLOATING HEARTS & SPARKLE GENERATOR ---
 function createFloatingHeart() {
-    if (heartsContainer.childElementCount >= CONFIG.maxHearts) return;
+    const container = document.getElementById("hearts-bg");
+    if (!container) return;
+    if (container.childElementCount >= CONFIG.maxHearts) return;
 
     const heart = document.createElement("div");
     heart.classList.add("heart-float");
-    
-    const hearts = ["🎂", "🎉", "🥳", "🌸", "✨", "🎈"];
-    heart.innerText = hearts[Math.floor(Math.random() * hearts.length)];
-    
-    heart.style.left = Math.random() * 100 + "vw";
-    const duration = Math.random() * 5 + 5; // 5s to 10s
-    heart.style.animationDuration = duration + "s";
-    const size = Math.random() * 1.2 + 0.6;
-    heart.style.fontSize = size + "rem";
-    
-    heartsContainer.appendChild(heart);
 
+    const emojis = ["🎂", "🎉", "🥳", "🌸", "✨", "🎈"];
+    heart.innerText = emojis[Math.floor(Math.random() * emojis.length)];
+
+    // Random horizontal position
+    heart.style.left = Math.random() * 100 + "vw";
+
+    // Random speed between 4s and 9s
+    const duration = Math.random() * 5 + 4;
+    heart.style.animationDuration = duration + "s";
+
+    // Random delay up to 3s
+    const delay = Math.random() * 3;
+    heart.style.animationDelay = delay + "s";
+
+    // Random font size between 1rem and 2.2rem
+    const size = Math.random() * 1.2 + 1;
+    heart.style.fontSize = size + "rem";
+
+    container.appendChild(heart);
+
+    // Remove from DOM after animation completes
     setTimeout(() => {
         heart.remove();
-    }, duration * 1000);
+    }, (duration + delay) * 1000);
 }
 
 function createSparkleBurst() {
@@ -350,7 +362,7 @@ btnWishBlow.addEventListener("click", () => {
     // Update screen title and reveal NEXT button
     setTimeout(() => {
         appState.candlesBlown = true;
-        wishTitle.innerHTML = `Happy Birthday Aishwarya! 🎉`;
+        wishTitle.innerHTML = `Happy Birthday Aishwarya! 🥳🎉`;
         btnWishNext.classList.remove("hidden");
     }, candles.length * 200 + 400);
 });
@@ -451,28 +463,63 @@ if (bgMusic && btnMusicToggle && volumeSlider) {
     // Default volume
     bgMusic.volume = 0.5;
 
-    // Auto-play on first click anywhere
-    function startMusic() {
-        if (bgMusic.paused) {
-            bgMusic.play().then(() => {
-                btnMusicToggle.innerText = "❚❚"; // Pause icon
-                document.removeEventListener("click", startMusic);
-            }).catch(err => {
-                console.log("Autoplay prevented:", err);
+    // Helper: update the play/pause icon
+    function updateMusicIcon() {
+        btnMusicToggle.innerText = bgMusic.paused ? "▶" : "❚❚";
+    }
+
+    // Flag to track whether we've successfully started music
+    let musicStarted = false;
+
+    // Try to play music — returns true if successful
+    function tryPlayMusic() {
+        if (musicStarted && !bgMusic.paused) return true;
+        const playPromise = bgMusic.play();
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                musicStarted = true;
+                updateMusicIcon();
+                removeAutoplayListeners();
+            }).catch(() => {
+                // Autoplay blocked — will retry on first user interaction
             });
         }
+        return false;
     }
-    document.addEventListener("click", startMusic);
 
-    // Toggle play/pause
+    // First-interaction autoplay handler — fires on the FIRST click/touch/keydown
+    function onFirstInteraction() {
+        if (!musicStarted) {
+            tryPlayMusic();
+        }
+    }
+
+    function removeAutoplayListeners() {
+        document.removeEventListener("click", onFirstInteraction, true);
+        document.removeEventListener("touchstart", onFirstInteraction, true);
+        document.removeEventListener("keydown", onFirstInteraction, true);
+    }
+
+    // Register interaction listeners (capture phase so they fire before any stopPropagation)
+    document.addEventListener("click", onFirstInteraction, true);
+    document.addEventListener("touchstart", onFirstInteraction, true);
+    document.addEventListener("keydown", onFirstInteraction, true);
+
+    // Attempt immediate autoplay (works when browser policy allows)
+    tryPlayMusic();
+
+    // Toggle play/pause manually
     btnMusicToggle.addEventListener("click", (e) => {
-        e.stopPropagation(); // prevent triggering the document click listener
+        e.stopPropagation(); // prevent triggering the interaction listener again
         if (bgMusic.paused) {
-            bgMusic.play();
-            btnMusicToggle.innerText = "❚❚"; // Pause icon
+            bgMusic.play().then(() => {
+                musicStarted = true;
+                updateMusicIcon();
+                removeAutoplayListeners();
+            }).catch(() => {});
         } else {
             bgMusic.pause();
-            btnMusicToggle.innerText = "▶"; // Play icon
+            updateMusicIcon();
         }
     });
 
@@ -490,4 +537,8 @@ window.addEventListener("DOMContentLoaded", () => {
     setInterval(createSparkleBurst, 1500);
     // Initial typewriter run
     runTypewriter();
+    // Retry autoplay now that DOM is fully ready (some browsers allow it at this point)
+    if (typeof tryPlayMusic === "function") {
+        tryPlayMusic();
+    }
 });

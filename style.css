@@ -45,27 +45,27 @@ body {
 }
 
 .heart-float {
-    position: absolute;
-    bottom: -50px;
-    font-size: 1.5rem;
-    color: rgba(255, 255, 255, 0.4);
-    animation: floatUp 8s linear infinite;
+    position: fixed;
+    top: -80px;
+    pointer-events: none;
+    z-index: 1;
+    animation: fallDown linear forwards;
     opacity: 0;
 }
 
-@keyframes floatUp {
+@keyframes fallDown {
     0% {
-        transform: translateY(0) rotate(0deg) scale(0.6);
+        transform: translateY(0) rotate(0deg);
         opacity: 0;
     }
     10% {
-        opacity: 0.7;
+        opacity: 0.9;
     }
-    90% {
-        opacity: 0.7;
+    80% {
+        opacity: 0.75;
     }
     100% {
-        transform: translateY(-110vh) rotate(360deg) scale(1.2);
+        transform: translateY(115vh) rotate(360deg);
         opacity: 0;
     }
 }
@@ -114,7 +114,7 @@ body {
     width: 100%;
     max-width: 650px;
     min-height: 100vh;
-    padding: 20px;
+    padding: 20px 20px 90px 20px; /* extra bottom padding to clear the fixed music footer */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -418,9 +418,12 @@ body {
 .action-footer {
     height: 50px;
     margin-top: 15px;
+    margin-bottom: 20px; /* extra clearance so NEXT button stays above the music footer */
     display: flex;
     justify-content: center;
     width: 100%;
+    position: relative;
+    z-index: 10;
 }
 
 .btn-next {
@@ -1452,8 +1455,7 @@ body {
 .gallery-grid-item img {
     width: 100%;
     height: auto;
-    aspect-ratio: 4 / 3;
-    object-fit: cover;
+    object-fit: contain;
     border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 2px;
     display: block;
@@ -1657,7 +1659,7 @@ body {
 @media (max-width: 620px) {
     /* Scaling is handled dynamically by JS, but we make sure the containers centring fits */
     #app {
-        padding: 10px;
+        padding: 10px 10px 90px 10px; /* preserve bottom clearance for music footer */
     }
 }
 
@@ -1720,6 +1722,7 @@ body {
     -webkit-backdrop-filter: blur(8px);
     box-sizing: border-box;
     text-align: center;
+    font-family: 'Caveat', cursive;
 }
 
 .popup-message.hidden {
@@ -1731,10 +1734,11 @@ body {
 }
 
 .popup-text {
-    margin-bottom: 15px;
+    margin-bottom: 10px;
     line-height: 1.6;
     color: #ffffff;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    font-family: 'Caveat', cursive;
 }
 
 .popup-message .font-md {
@@ -1747,6 +1751,7 @@ body {
 
 .popup-text:last-child {
     margin-bottom: 0;
+    font-family: 'Caveat', cursive;
 }
 
 .restart-wrapper {
@@ -1794,12 +1799,13 @@ body {
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
-/* Music controller footer sticky styles */
+/* Music controller footer sticky styles — positioned to never overlap buttons */
 .music-controller-footer {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 1000;
+    bottom: 12px;
+    right: 16px;
+    left: auto;
+    z-index: 999; /* high but below camera flash (1000) */
     background: rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -1810,6 +1816,8 @@ body {
     display: flex;
     align-items: center;
     pointer-events: auto;
+    max-width: calc(100vw - 32px); /* prevent overflow on tiny screens */
+    transform: none; /* reset any inherited transforms */
 }
 
 .music-controls {
@@ -1870,16 +1878,46 @@ body {
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
-/* responsive mobile override for music control */
+/* responsive mobile override for music control — keep bottom-right, not centered,
+   so it doesn't sit directly above centered NEXT/BLOW/TAKE buttons */
 @media (max-width: 480px) {
     .music-controller-footer {
-        bottom: 12px;
-        right: 50%;
-        transform: translateX(50%); /* centers bottom screen on mobile */
-        padding: 6px 12px;
+        bottom: 10px;
+        right: 10px;
+        left: auto;
+        transform: none; /* no centering — stays bottom-right corner to avoid button overlap */
+        padding: 6px 10px;
+        border-radius: 24px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.15);
     }
     .volume-slider {
-        width: 65px;
+        width: 55px;
+    }
+    .btn-music-control {
+        width: 30px;
+        height: 30px;
+        font-size: 0.75rem;
+    }
+    .volume-icon {
+        font-size: 0.85rem;
+    }
+
+    /* Ensure page content has enough bottom clearance on mobile */
+    .container {
+        padding-bottom: 70px;
+    }
+    .action-footer {
+        margin-bottom: 30px;
+    }
+
+    /* Ensure all primary buttons sit above the music footer */
+    .btn-primary,
+    .btn-blow,
+    .btn-take,
+    .btn-see,
+    .btn-next,
+    .btn-restart {
+        position: relative;
+        z-index: 10;
     }
 }
