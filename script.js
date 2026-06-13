@@ -629,20 +629,10 @@ window.addEventListener("DOMContentLoaded", () => {
         tryPlayMusic();
     }
 
-    // Seed the initial hash using replaceState so we don't push an extra
-    // history entry — the user can still press Back to exit the site from
-    // the welcome screen.
-    const initialHash = SCREEN_HASHES["screen-welcome"]; // "#welcome"
-    if (!window.location.hash || !HASH_TO_SCREEN[window.location.hash]) {
-        // No recognised hash in the URL — set #welcome without a new history entry
-        lastProgrammaticHash = initialHash;
-        history.replaceState(null, "", initialHash);
-    } else {
-        // Page opened with a recognised hash (e.g. bookmarked #gifts) —
-        // show that screen directly.
-        const startScreen = HASH_TO_SCREEN[window.location.hash];
-        if (startScreen && startScreen !== "screen-welcome") {
-            showScreen(startScreen);
-        }
-    }
+    // ALWAYS start at the welcome screen — even if the URL has a leftover
+    // hash from a previous session (e.g. #gifts after a refresh).
+    // replaceState swaps the current history entry without pushing a new one,
+    // so the user can still press Back to exit the site from the welcome screen.
+    lastProgrammaticHash = SCREEN_HASHES["screen-welcome"]; // "#welcome"
+    history.replaceState(null, "", lastProgrammaticHash);
 });
