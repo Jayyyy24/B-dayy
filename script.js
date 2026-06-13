@@ -2,6 +2,16 @@
  * Aishwarya's Birthday Website - Script Configuration & Interactive Logic
  */
 
+// --- IMMEDIATE HASH RESET (runs synchronously on every page load) ---
+// This executes BEFORE any event listeners are registered, so even if the
+// browser fires a hashchange event during load, the hash is already #welcome.
+// Handles: full reload, pull-to-refresh, navigating to a bookmarked URL.
+(function() {
+    if (window.location.hash && window.location.hash !== "#welcome") {
+        history.replaceState(null, "", "#welcome");
+    }
+})();
+
 // --- CONFIGURATION CORNER ---
 const CONFIG = {
     passcode: "1432", // Passcode from the video (1432)
@@ -629,10 +639,58 @@ window.addEventListener("DOMContentLoaded", () => {
         tryPlayMusic();
     }
 
-    // ALWAYS start at the welcome screen — even if the URL has a leftover
-    // hash from a previous session (e.g. #gifts after a refresh).
-    // replaceState swaps the current history entry without pushing a new one,
-    // so the user can still press Back to exit the site from the welcome screen.
-    lastProgrammaticHash = SCREEN_HASHES["screen-welcome"]; // "#welcome"
+    // Belt-and-suspenders: also reset hash here in case the synchronous
+    // IIFE at the top ran before replaceState was fully available.
+    lastProgrammaticHash = SCREEN_HASHES["screen-welcome"];
     history.replaceState(null, "", lastProgrammaticHash);
+});
+
+// --- BFCACHE / PULL-TO-REFRESH HANDLER ---
+// Android Chrome pull-to-refresh may restore the page from bfcache (back-forward
+// cache). When that happens, DOMContentLoaded does NOT fire — the entire JS state,
+// DOM classes, and active screen are preserved in memory exactly as they were.
+// pageshow fires in ALL cases: fresh load, bfcache restore, and pull-to-refresh.
+window.addEventListener("pageshow", (e) => {
+    // e.persisted === true means the page was restored from bfcache
+    // But we reset on EVERY pageshow to also catch Android Chrome edge cases
+    // where persisted is false but the DOM state is still stale.
+
+    // Reset the hash to #welcome
+    lastProgrammaticHash = "#welcome";
+    history.replaceState(null, "", "#welcome");
+
+    // If the DOM is showing a screen other than welcome, fix it
+    if (appState.currentScreen !== "screen-welcome") {
+        // Deactivate whatever screen was showing
+        const staleScreen = document.getElementById(appState.currentScreen);
+        if (staleScreen) staleScreen.classList.remove("active");
+
+        // Activate welcome screen
+        const welcomeScreen = document.getElementById("screen-welcome");
+        if (welcomeScreen) welcomeScreen.classList.add("active");
+
+        // Reset all app state to initial values
+        appState.currentScreen = "screen-welcome";
+        appState.enteredPasscode = "";
+        appState.passcodeCorrect = false;
+        appState.candlesBlown = false;
+        appState.letterOpened = false;
+        appState.visitedGallery = false;
+        appState.visitedLetter = false;
+
+        // Re-run the welcome typewriter
+        runTypewriter();
+
+        // Hide the popup and restart button (they may have been revealed)
+        const specialMsgPopup = document.getElementById("special-msg-popup");
+        const restartContainer = document.getElementById("restart-container");
+        if (specialMsgPopup) {
+            specialMsgPopup.classList.add("hidden");
+            specialMsgPopup.classList.remove("fade-in");
+        }
+        if (restartContainer) {
+            restartContainer.classList.add("hidden");
+            restartContainer.classList.remove("fade-in");
+        }
+    }
 });
