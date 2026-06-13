@@ -339,6 +339,7 @@ btnWelcomeNo.addEventListener("click", () => {
     navigateTo("screen-goaway");
 });
 
+
 // Back from Go Away — history.back() restores #welcome hash → hashchange fires → showScreen
 btnGoAwayBack.addEventListener("click", () => {
     history.back();

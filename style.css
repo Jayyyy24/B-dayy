@@ -1688,6 +1688,8 @@ body {
 .welcome-sticker-wrapper {
     margin: 20px 0;
     display: flex;
+    flex-direction: column;
+    align-items: center;
     justify-content: center;
     width: 100%;
 }
@@ -1696,6 +1698,30 @@ body {
     max-width: 260px; /* Slightly larger than normal passcode sticker */
     height: auto;
     filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.2));
+}
+
+.tap-hint {
+    font-family: 'Caveat', cursive;
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin-top: 8px;
+    user-select: none;
+    pointer-events: none;
+    animation: tapPulse 2s infinite ease-in-out;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes tapPulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.85;
+    }
+    50% {
+        transform: scale(1.08) translateY(-2px);
+        opacity: 1;
+        text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+    }
 }
 
 .passcode-hint {
