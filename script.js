@@ -136,10 +136,21 @@ function adjustCollageScale() {
 window.addEventListener("resize", adjustCollageScale);
 window.addEventListener("load", adjustCollageScale);
 
-// --- NAVIGATION MANAGER ---
+// --- NAVIGATION MANAGER (with History API) ---
+
+// Flag: when true, navigateTo() won't push a new history entry (used during popstate)
+let isHandlingPopstate = false;
+
+// Internal history stack — mirrors the browser history entries we own
+let navHistory = ["screen-welcome"];
+
+/**
+ * Core navigation — switches the visible screen.
+ * Pushes a browser history entry unless we're responding to a popstate event.
+ */
 function navigateTo(screenId) {
     console.log(`Navigating to ${screenId}`);
-    
+
     // Deactivate current screen
     const current = document.getElementById(appState.currentScreen);
     if (current) {
@@ -151,16 +162,22 @@ function navigateTo(screenId) {
     if (target) {
         target.classList.add("active");
         appState.currentScreen = screenId;
-        
+
+        // --- History API: push state so browser Back works ---
+        if (!isHandlingPopstate) {
+            navHistory.push(screenId);
+            history.pushState({ screen: screenId }, "", "");
+        }
+
         // Dynamic layouts adjustment on activation
         if (screenId === "screen-welcome") {
             runTypewriter();
         }
-        
+
         if (screenId === "screen-passcode") {
             resetPasscode();
         }
-        
+
         if (screenId === "screen-gifts") {
             checkRevealRestart();
         }
@@ -170,6 +187,31 @@ function navigateTo(screenId) {
         }
     }
 }
+
+/**
+ * Handle the browser / OS back button.
+ * Pops our internal stack and navigates to the previous screen.
+ * If there's no previous screen, we let the browser leave the page naturally.
+ */
+window.addEventListener("popstate", (e) => {
+    // Remove the screen we're leaving from our stack
+    if (navHistory.length > 1) {
+        navHistory.pop();
+    }
+
+    const previousScreen = navHistory.length > 0
+        ? navHistory[navHistory.length - 1]
+        : "screen-welcome";
+
+    // Side-effects for specific back transitions
+    if (appState.currentScreen === "detail-letter") {
+        resetEnvelope();
+    }
+
+    isHandlingPopstate = true;
+    navigateTo(previousScreen);
+    isHandlingPopstate = false;
+});
 
 // --- FLOATING HEARTS & SPARKLE GENERATOR ---
 function createFloatingHeart() {
@@ -264,9 +306,9 @@ btnWelcomeNo.addEventListener("click", () => {
     navigateTo("screen-goaway");
 });
 
-// Back from Go Away
+// Back from Go Away — use history.back() to keep browser history in sync
 btnGoAwayBack.addEventListener("click", () => {
-    navigateTo("screen-welcome");
+    history.back();
 });
 
 // --- PASSCODE LOGIC ---
@@ -382,16 +424,13 @@ giftGallery.addEventListener("click", () => {
     navigateTo("detail-gallery");
 });
 
-// Back to Gift Hub triggers
+// Back to Gift Hub triggers — use history.back() so browser history stays in sync
 btnLetterBack.addEventListener("click", () => {
-    navigateTo("screen-gifts");
-    resetEnvelope();
-    checkRevealRestart();
+    history.back(); // popstate handler will call resetEnvelope() and navigateTo
 });
 
 btnGalleryBack.addEventListener("click", () => {
-    navigateTo("screen-gifts");
-    checkRevealRestart();
+    history.back(); // popstate handler navigates back to screen-gifts
 });
 
 function checkRevealRestart() {
@@ -541,4 +580,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (typeof tryPlayMusic === "function") {
         tryPlayMusic();
     }
+
+    // Set the initial history entry so the first screen is in the browser stack
+    history.replaceState({ screen: "screen-welcome" }, "", "");
 });
